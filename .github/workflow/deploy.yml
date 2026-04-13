@@ -1,0 +1,61 @@
+name: Deploy FridgeAI to Amazon ECS on code change
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'backend/app/**'       # Only trigger if code in the app folder changes
+      - 'backend/Dockerfile'
+      - 'backend/requirements.txt'
+
+env:
+  AWS_REGION: us-east-2
+  ECR_WEB_REPO: fridgeai-group-web
+  ECR_WORKER_REPO: fridgeai-group-worker
+  ECS_CLUSTER: FridgeAI-Group-Cluster-TF1
+  ECS_WEB_SERVICE: fridgeaigroup-web-service-tf1
+  ECS_WORKER_SERVICE: fridgeai-worker-service-tf1
+
+jobs:
+  deploy:
+    name: Build, Push and Restart
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # --- BUILD & PUSH SECTION ---
+    - name: Build and Push Web Image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        docker build -t $ECR_REGISTRY/${{ env.ECR_WEB_REPO }}:latest -f backend/Dockerfile backend/
+        docker push $ECR_REGISTRY/${{ env.ECR_WEB_REPO }}:latest
+
+    - name: Build and Push Worker Image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        docker build -t $ECR_REGISTRY/${{ env.ECR_WORKER_REPO }}:latest -f backend/Dockerfile backend/
+        docker push $ECR_REGISTRY/${{ env.ECR_WORKER_REPO }}:latest
+
+    # --- RESTART ECS SECTION ---
+    - name: Force ECS Web Service Redeploy
+      run: |
+        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_WEB_SERVICE }} --force-new-deployment
+
+    - name: Force ECS Worker Service Redeploy
+      run: |
+        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_WORKER_SERVICE }} --force-new-deployment
