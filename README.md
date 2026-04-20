@@ -97,9 +97,3 @@ Typical Celery statuses: `PENDING`, `STARTED`, `SUCCESS`, `FAILURE`.
 ## Deployment
 
 Pushing to `main` can trigger **GitHub Actions** when `backend/app/**`, `backend/Dockerfile`, or `backend/requirements.txt` change: images are built and pushed to **Amazon ECR**, then **ECS** services are forced to redeploy. Infrastructure details live under `backend/terraform/`.
-
----
-
-## License
-
-Add a license file if you distribute this project publicly.
