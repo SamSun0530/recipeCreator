@@ -1,15 +1,27 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+import os
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from app.worker import extract_ingredients_task, match_recipes_task, refine_recipe_task, celery_app
 from celery import chain
 from celery.result import AsyncResult
 
 app = FastAPI()
 
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
+_cors = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/")
 async def root():
     return {
         "message": "FridgeAI API is online!",
-        "endpoints": ["/docs", "/upload", "/status/{id}"]
+        "endpoints": ["/docs", "/upload-fridge", "/tasks/{task_id}"]
     }
 
 @app.post("/upload-fridge")
